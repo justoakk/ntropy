@@ -316,17 +316,27 @@ class CashTrackerGUI:
             )
             return
 
-        # Check if region is configured for this game
+        # Check if both regions are configured for this game
         game_config = self.storage.get_game_config(self.current_game_id)
-        if not game_config or not game_config.get("region"):
+        region_conv = game_config.get("region_converted") if game_config else None
+        region_int = game_config.get("region_integer") if game_config else None
+
+        if not region_conv or not region_int:
+            missing = []
+            if not region_conv:
+                missing.append("Valores Convertidos")
+            if not region_int:
+                missing.append("Valores Inteiros")
+
             response = messagebox.askyesno(
-                "Região não configurada",
-                f"A região de captura para {game_config.get('name', 'este jogo')} ainda não foi configurada.\n\n"
+                "Regiões não configuradas",
+                f"As seguintes regiões precisam ser configuradas para {game_config.get('name', 'este jogo')}:\n"
+                f"• {' e '.join(missing)}\n\n"
                 "Deseja configurar agora?"
             )
             if response:
                 # TODO: Open region selector for this specific game
-                messagebox.showinfo("Em desenvolvimento", "Configuração de região por jogo em breve!")
+                messagebox.showinfo("Em desenvolvimento", "Configuração de regiões por jogo em breve!")
             return
 
         self._set_status("Capturando...")
@@ -341,42 +351,65 @@ class CashTrackerGUI:
         try:
             # Get region coordinates for current game
             game_config = self.storage.get_game_config(self.current_game_id)
-            region = game_config.get("region")
+            region_converted = game_config.get("region_converted")
+            region_integer = game_config.get("region_integer")
 
-            if not region:
-                self.root.after(0, lambda: self._capture_failed("Região não configurada"))
+            if not region_converted or not region_integer:
+                self.root.after(0, lambda: self._capture_failed("Regiões não configuradas. Configure ambas as regiões."))
                 return
 
-            x = region["x"]
-            y = region["y"]
-            width = region["width"]
-            height = region["height"]
+            # Get conversion ratio
+            ratio = self.storage.get_conversion_ratio()
 
-            # Capture screen region
-            image = self.screen_capture.capture_region(x, y, width, height)
+            # === CAPTURE CONVERTED VALUES ===
+            image_conv = self.screen_capture.capture_region(
+                region_converted["x"],
+                region_converted["y"],
+                region_converted["width"],
+                region_converted["height"]
+            )
 
-            if image is None:
-                self.root.after(0, lambda: self._capture_failed("Falha ao capturar tela"))
+            if image_conv is None:
+                self.root.after(0, lambda: self._capture_failed("Falha ao capturar valores convertidos"))
                 return
 
-            # Preprocess for better OCR
-            image = self.screen_capture.preprocess_for_ocr(image)
+            image_conv = self.screen_capture.preprocess_for_ocr(image_conv)
+            value_converted = self.ocr.extract_number(image_conv, debug=True)
 
-            # Save debug image (optional)
-            # self.screen_capture.save_debug_image(image, "last_capture.png")
+            if value_converted is None:
+                value_converted = 0  # Se não conseguir ler, assume 0
 
-            # Extract number using OCR
-            value = self.ocr.extract_number(image, debug=True)
+            # === CAPTURE INTEGER VALUES ===
+            image_int = self.screen_capture.capture_region(
+                region_integer["x"],
+                region_integer["y"],
+                region_integer["width"],
+                region_integer["height"]
+            )
 
-            if value is None:
-                self.root.after(0, lambda: self._capture_failed("Não foi possível ler o número"))
+            if image_int is None:
+                self.root.after(0, lambda: self._capture_failed("Falha ao capturar valores inteiros"))
                 return
+
+            image_int = self.screen_capture.preprocess_for_ocr(image_int)
+            value_integer = self.ocr.extract_number(image_int, debug=True)
+
+            if value_integer is None:
+                value_integer = 0  # Se não conseguir ler, assume 0
+
+            # === CALCULATE TOTAL ===
+            # Formula: Total = Converted + (Integer / 160)
+            total_value = value_converted + (value_integer / ratio)
+
+            print(f"Convertidos: {value_converted}")
+            print(f"Inteiros: {value_integer}")
+            print(f"Cálculo: {value_converted} + ({value_integer} / {ratio}) = {total_value}")
 
             # Save to storage with game_id
-            capture_id = self.storage.save_capture(value, game_id=self.current_game_id)
+            capture_id = self.storage.save_capture(total_value, game_id=self.current_game_id)
 
             # Update UI in main thread
-            self.root.after(0, lambda: self._capture_success(value))
+            self.root.after(0, lambda: self._capture_success(total_value))
 
         except Exception as e:
             self.root.after(0, lambda: self._capture_failed(f"Erro: {str(e)}"))

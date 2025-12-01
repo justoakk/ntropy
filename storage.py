@@ -121,6 +121,39 @@ class Storage:
         config["games"][str(game_id)].update(kwargs)
         self._write_json(self.config_file, config)
 
+    def save_game_region_converted(self, game_id: int, x: int, y: int, width: int, height: int):
+        """Save region coordinates for converted values."""
+        config = self.get_config()
+        if "games" not in config or str(game_id) not in config["games"]:
+            return
+
+        config["games"][str(game_id)]["region_converted"] = {
+            "x": x,
+            "y": y,
+            "width": width,
+            "height": height
+        }
+        self._write_json(self.config_file, config)
+
+    def save_game_region_integer(self, game_id: int, x: int, y: int, width: int, height: int):
+        """Save region coordinates for integer values."""
+        config = self.get_config()
+        if "games" not in config or str(game_id) not in config["games"]:
+            return
+
+        config["games"][str(game_id)]["region_integer"] = {
+            "x": x,
+            "y": y,
+            "width": width,
+            "height": height
+        }
+        self._write_json(self.config_file, config)
+
+    def get_conversion_ratio(self) -> int:
+        """Get the conversion ratio (integer / ratio = converted)."""
+        config = self.get_config()
+        return config.get("conversion_ratio", 160)
+
     def migrate_old_data(self):
         """Migrate old single-game format to new multi-game format."""
         try:

@@ -3,24 +3,37 @@
     "1": {
       "name": "Genshin Impact",
       "process_name": "GenshinImpact.exe",
-      "region": null
+      "region_converted": null,
+      "region_integer": null,
+      "auto_capture_key": "f3",
+      "auto_capture_delay": 3
     },
     "2": {
       "name": "Honkai Star Rail",
       "process_name": "StarRail.exe",
-      "region": null
+      "region_converted": null,
+      "region_integer": null,
+      "auto_capture_key": "f3",
+      "auto_capture_delay": 3
     },
     "3": {
       "name": "Zenless Zone Zero",
       "process_name": "ZenlessZoneZero.exe",
-      "region": null
+      "region_converted": null,
+      "region_integer": null,
+      "auto_capture_key": "f4",
+      "auto_capture_delay": 3
     },
     "4": {
       "name": "Wuthering Waves",
       "process_name": "Wuthering Waves.exe",
-      "region": null
+      "region_converted": null,
+      "region_integer": null,
+      "auto_capture_key": "f3",
+      "auto_capture_delay": 3
     }
   },
+  "conversion_ratio": 160,
   "hotkey": "F9",
   "always_on_top": true
 }
