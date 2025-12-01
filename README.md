@@ -1,4 +1,4 @@
-# Cash Tracker
+# Ntropy
 
 Aplicação desktop para capturar e armazenar valores numéricos da tela usando OCR (Reconhecimento Óptico de Caracteres).
 
