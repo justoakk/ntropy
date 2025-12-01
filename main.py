@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Cash Tracker - Screen Value Capture Application
+Ntropy - Screen Value Capture Application
 
 Main entry point for the application.
 """
@@ -62,7 +62,7 @@ def show_dependency_error(missing):
 def main():
     """Main application entry point."""
     print("=" * 50)
-    print("Cash Tracker - Iniciando...")
+    print("Ntropy - Iniciando...")
     print("=" * 50)
 
     # Check dependencies
@@ -83,13 +83,13 @@ def main():
 
     # Import GUI (after dependency check)
     try:
-        from gui import CashTrackerGUI
+        from gui import NtropyGUI
 
         # Create main window
         root = tk.Tk()
 
         # Create and run application
-        app = CashTrackerGUI(root)
+        app = NtropyGUI(root)
 
         print("✓ Aplicação iniciada com sucesso!")
         print("  Pressione F9 para capturar valores")

@@ -1,5 +1,5 @@
 @echo off
-REM Ntropy - Cash Tracker Launcher for Windows
+REM Ntropy Launcher for Windows
 
 REM Vai para o diretório do script
 cd /d "%~dp0"

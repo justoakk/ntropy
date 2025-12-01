@@ -11,12 +11,12 @@ from region_selector import select_region_simple
 from game_detector import GameDetector
 
 
-class CashTrackerGUI:
-    """Main GUI for the Cash Tracker application."""
+class NtropyGUI:
+    """Main GUI for the Ntropy application."""
 
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("Cash Tracker")
+        self.root.title("Ntropy")
         self.root.geometry("600x700")
 
         # Initialize components
@@ -72,6 +72,8 @@ class CashTrackerGUI:
         # Data menu
         data_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Dados", menu=data_menu)
+        data_menu.add_command(label="Ver Objetivos", command=self._show_objectives)
+        data_menu.add_separator()
         data_menu.add_command(label="Exportar para CSV", command=self._export_csv)
         data_menu.add_command(label="Limpar Histórico", command=self._clear_history)
 
@@ -540,7 +542,7 @@ class CashTrackerGUI:
         filename = filedialog.asksaveasfilename(
             defaultextension=".csv",
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
-            initialfile=f"cash_tracker_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            initialfile=f"ntropy_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         )
 
         if filename:
@@ -566,8 +568,8 @@ class CashTrackerGUI:
     def _show_about(self):
         """Show about dialog."""
         messagebox.showinfo(
-            "Sobre Cash Tracker",
-            "Cash Tracker v2.0 - Multi-Jogos\n\n"
+            "Sobre Ntropy",
+            "Ntropy v2.0 - Multi-Jogos\n\n"
             "Captura automática de valores para 4 jogos:\n"
             "• Genshin Impact\n"
             "• Honkai Star Rail\n"
@@ -579,6 +581,10 @@ class CashTrackerGUI:
             "F9 - Captura manual\n\n"
             "Desenvolvido com Python + Tkinter + Tesseract OCR"
         )
+
+    def _show_objectives(self):
+        """Show objectives window."""
+        ObjectivesWindow(self.root, self.storage)
 
     def _set_status(self, message: str):
         """Set status message."""
@@ -592,8 +598,8 @@ class CashTrackerGUI:
 
         if not any_configured:
             messagebox.showinfo(
-                "Bem-vindo ao Cash Tracker Multi-Jogos!",
-                "Bem-vindo ao Cash Tracker!\n\n"
+                "Bem-vindo ao Ntropy Multi-Jogos!",
+                "Bem-vindo ao Ntropy!\n\n"
                 "Este app detecta automaticamente qual dos 4 jogos está rodando:\n"
                 "• Genshin Impact\n"
                 "• Honkai Star Rail\n"
@@ -607,3 +613,599 @@ class CashTrackerGUI:
             )
 
         self.root.mainloop()
+
+
+class ObjectivesWindow:
+    """Window to view and manage objectives across all games."""
+
+    def __init__(self, parent, storage: Storage):
+        self.storage = storage
+        self.window = tk.Toplevel(parent)
+        self.window.title("Objetivos - Gacha Tracker")
+        self.window.geometry("950x650")
+        self.window.transient(parent)
+
+        # Game colors
+        self.game_colors = {
+            1: "#4CAF50",  # Green - Genshin Impact
+            2: "#2196F3",  # Blue - Honkai Star Rail
+            3: "#FF9800",  # Orange - Zenless Zone Zero
+            4: "#9C27B0"   # Purple - Wuthering Waves
+        }
+
+        # Temporary injected values (game_id -> pulls)
+        self.injected_values = {}
+
+        self._setup_ui()
+        self._load_objectives()
+
+    def _setup_ui(self):
+        """Setup the objectives window UI."""
+        main_frame = ttk.Frame(self.window, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Title
+        title_label = tk.Label(
+            main_frame,
+            text="🎯 Objetivos por Jogo",
+            font=("Arial", 16, "bold")
+        )
+        title_label.pack(pady=(0, 10))
+
+        # Simulation frame
+        sim_frame = ttk.LabelFrame(main_frame, text="🧪 Simulação de Pulls (temporário)", padding="10")
+        sim_frame.pack(fill=tk.X, pady=(0, 10))
+
+        sim_info = ttk.Frame(sim_frame)
+        sim_info.pack(fill=tk.X)
+
+        ttk.Label(
+            sim_info,
+            text="Jogo:",
+            font=("Arial", 9, "bold")
+        ).pack(side=tk.LEFT, padx=(0, 5))
+
+        self.sim_game_var = tk.StringVar()
+        sim_game_combo = ttk.Combobox(
+            sim_info,
+            textvariable=self.sim_game_var,
+            state="readonly",
+            width=20,
+            font=("Arial", 9)
+        )
+        games = self.storage.get_all_games()
+        game_options = [f"{game_id}: {config['name']}" for game_id, config in games.items()]
+        sim_game_combo['values'] = game_options
+        if game_options:
+            sim_game_combo.current(0)
+        sim_game_combo.pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Label(
+            sim_info,
+            text="Pulls:",
+            font=("Arial", 9, "bold")
+        ).pack(side=tk.LEFT, padx=(0, 5))
+
+        self.sim_pulls_entry = ttk.Entry(sim_info, width=10, font=("Arial", 9))
+        self.sim_pulls_entry.pack(side=tk.LEFT, padx=(0, 10))
+        self.sim_pulls_entry.insert(0, "0")
+
+        apply_btn = tk.Button(
+            sim_info,
+            text="✓ Aplicar",
+            command=self._apply_simulation,
+            font=("Arial", 9, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            cursor="hand2"
+        )
+        apply_btn.pack(side=tk.LEFT, padx=(0, 5))
+
+        clear_btn = tk.Button(
+            sim_info,
+            text="✗ Limpar",
+            command=self._clear_simulation,
+            font=("Arial", 9),
+            cursor="hand2"
+        )
+        clear_btn.pack(side=tk.LEFT)
+
+        # Status label for simulation
+        self.sim_status_label = tk.Label(
+            sim_frame,
+            text="Use valores temporários para simular probabilidades sem capturar da tela",
+            font=("Arial", 8),
+            fg="gray"
+        )
+        self.sim_status_label.pack(pady=(5, 0))
+
+        # Scrollable frame for objectives
+        canvas = tk.Canvas(main_frame)
+        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.objectives_container = scrollable_frame
+
+        # Bottom buttons frame
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(10, 0))
+
+        add_btn = tk.Button(
+            button_frame,
+            text="➕ Adicionar Objetivo",
+            command=self._add_objective,
+            font=("Arial", 12, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            cursor="hand2"
+        )
+        add_btn.pack(side=tk.LEFT, padx=5)
+
+        refresh_btn = tk.Button(
+            button_frame,
+            text="🔄 Atualizar",
+            command=self._load_objectives,
+            font=("Arial", 12),
+            cursor="hand2"
+        )
+        refresh_btn.pack(side=tk.LEFT, padx=5)
+
+    def _apply_simulation(self):
+        """Apply simulated pulls value for a game."""
+        game_str = self.sim_game_var.get()
+        if not game_str:
+            messagebox.showerror("Erro", "Selecione um jogo")
+            return
+
+        game_id = int(game_str.split(":")[0])
+
+        try:
+            pulls = float(self.sim_pulls_entry.get().strip())
+            if pulls < 0:
+                messagebox.showerror("Erro", "Digite um valor positivo")
+                return
+        except ValueError:
+            messagebox.showerror("Erro", "Digite um número válido")
+            return
+
+        # Store injected value
+        self.injected_values[game_id] = pulls
+
+        # Update status
+        game_name = self.storage.get_game_config(game_id)["name"]
+        self.sim_status_label.config(
+            text=f"✓ Simulando {pulls:.1f} pulls para {game_name}",
+            fg="green"
+        )
+
+        # Reload objectives to show updated probabilities
+        self._load_objectives()
+
+    def _clear_simulation(self):
+        """Clear all simulated values and return to real captured values."""
+        if not self.injected_values:
+            messagebox.showinfo("Info", "Nenhuma simulação ativa")
+            return
+
+        self.injected_values.clear()
+        self.sim_pulls_entry.delete(0, tk.END)
+        self.sim_pulls_entry.insert(0, "0")
+
+        self.sim_status_label.config(
+            text="Simulação limpa. Usando valores reais capturados.",
+            fg="blue"
+        )
+
+        # Reload objectives
+        self._load_objectives()
+
+    def _get_current_pulls(self, game_id: int) -> float:
+        """Get current pulls for a game, considering injected values."""
+        # Check if there's an injected value
+        if game_id in self.injected_values:
+            return self.injected_values[game_id]
+
+        # Otherwise, use real captured value
+        last_capture = self.storage.get_last_capture(game_id=game_id)
+        return last_capture.get("value", 0) if last_capture else 0
+
+    def _calculate_objective_progress(self, objective: dict, current_pulls: float) -> dict:
+        """Calculate progress for an objective with given pulls amount."""
+        pulls_needed = objective.get("pulls_needed", 180)
+        current_pity = objective.get("current_pity", 0)
+        guaranteed = objective.get("guaranteed", False)
+
+        # Calculate basic progress
+        progress_percent = (current_pulls / pulls_needed * 100) if pulls_needed > 0 else 0
+        progress_percent = min(progress_percent, 100)
+
+        remaining = max(pulls_needed - current_pulls, 0)
+
+        # Calculate real probability using gacha calculator
+        try:
+            from gacha_probability import get_calculator
+            calc = get_calculator()
+            prob_info = calc.get_probability_explanation(
+                int(current_pulls),
+                current_pity,
+                guaranteed
+            )
+
+            real_probability = prob_info["percentage"]
+            probability_explanation = prob_info["explanation"]
+        except Exception:
+            real_probability = progress_percent
+            probability_explanation = "Cálculo simples (pulls / total)"
+
+        return {
+            "objective": objective,
+            "current_pulls": current_pulls,
+            "progress_percent": progress_percent,
+            "real_probability": real_probability,
+            "probability_explanation": probability_explanation,
+            "remaining": remaining,
+            "is_complete": real_probability >= 99.0
+        }
+
+    def _load_objectives(self):
+        """Load and display all objectives with progress."""
+        # Clear existing widgets
+        for widget in self.objectives_container.winfo_children():
+            widget.destroy()
+
+        # Get all objectives
+        all_objectives = self.storage.get_all_objectives()
+
+        if not all_objectives:
+            # No objectives yet
+            no_obj_label = tk.Label(
+                self.objectives_container,
+                text="Nenhum objetivo cadastrado ainda.\n\nClique em 'Adicionar Objetivo' para criar um!",
+                font=("Arial", 12),
+                fg="gray"
+            )
+            no_obj_label.pack(pady=50)
+            return
+
+        # Display objectives grouped by game
+        for game_id in range(1, 5):
+            if game_id not in all_objectives:
+                continue
+
+            game_config = self.storage.get_game_config(game_id)
+            game_name = game_config.get("name", f"Jogo {game_id}")
+            game_color = self.game_colors[game_id]
+
+            # Game section
+            game_frame = ttk.LabelFrame(
+                self.objectives_container,
+                text=f"⭐ {game_name}",
+                padding="10"
+            )
+            game_frame.pack(fill=tk.X, pady=(0, 10))
+
+            # Get current pulls for this game (real or injected)
+            current_pulls = self._get_current_pulls(game_id)
+
+            # Show if using simulated value
+            if game_id in self.injected_values:
+                sim_indicator = tk.Label(
+                    game_frame,
+                    text=f"🧪 SIMULAÇÃO: {current_pulls:.1f} pulls (valor temporário)",
+                    font=("Arial", 9, "bold"),
+                    fg="orange",
+                    bg="#fff3cd",
+                    padx=5,
+                    pady=3
+                )
+                sim_indicator.pack(fill=tk.X, pady=(0, 5))
+
+            # Objectives for this game
+            for obj in all_objectives[game_id]:
+                # Calculate progress with current pulls (real or injected)
+                progress_data = self._calculate_objective_progress(obj, current_pulls)
+                obj = progress_data["objective"]
+                current = progress_data["current_pulls"]
+                percent = progress_data["progress_percent"]
+                real_prob = progress_data.get("real_probability", percent)
+                prob_explanation = progress_data.get("probability_explanation", "")
+                remaining = progress_data["remaining"]
+                is_complete = progress_data["is_complete"]
+
+                # Objective row
+                obj_frame = ttk.Frame(game_frame)
+                obj_frame.pack(fill=tk.X, pady=5)
+
+                # Left side: Name and progress bar
+                left_frame = ttk.Frame(obj_frame)
+                left_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+                # Objective name with state
+                pity = obj.get("current_pity", 0)
+                guaranteed = obj.get("guaranteed", False)
+                state_text = " 🎯" if guaranteed else " 🎲"
+                state_tooltip = "GARANTIDO" if guaranteed else "50/50"
+
+                name_label = tk.Label(
+                    left_frame,
+                    text=f"{obj['name']}{state_text}",
+                    font=("Arial", 12, "bold"),
+                    fg=game_color,
+                    anchor="w"
+                )
+                name_label.pack(anchor="w")
+
+                # State and pity info
+                state_info_label = tk.Label(
+                    left_frame,
+                    text=f"Estado: {state_tooltip}  •  Pity: {pity}/90",
+                    font=("Arial", 9),
+                    fg="#666",
+                    anchor="w"
+                )
+                state_info_label.pack(anchor="w")
+
+                # Progress info with REAL PROBABILITY
+                progress_text = f"{current:.1f} pulls guardados  •  Probabilidade Real: {real_prob:.1f}%"
+                if is_complete:
+                    progress_text += "  ✓ PRATICAMENTE GARANTIDO"
+
+                progress_label = tk.Label(
+                    left_frame,
+                    text=progress_text,
+                    font=("Arial", 10, "bold"),
+                    fg="green" if is_complete else game_color,
+                    anchor="w"
+                )
+                progress_label.pack(anchor="w")
+
+                # Progress bar (usando probabilidade real)
+                progress_bar_frame = ttk.Frame(left_frame)
+                progress_bar_frame.pack(fill=tk.X, pady=(2, 0))
+
+                canvas_progress = tk.Canvas(
+                    progress_bar_frame,
+                    height=20,
+                    bg="white",
+                    highlightthickness=1,
+                    highlightbackground="gray"
+                )
+                canvas_progress.pack(fill=tk.X)
+
+                # Draw progress bar using REAL PROBABILITY
+                bar_width = int((real_prob / 100) * canvas_progress.winfo_reqwidth() or 200)
+                bar_color = "green" if is_complete else game_color
+
+                canvas_progress.create_rectangle(
+                    0, 0, bar_width, 20,
+                    fill=bar_color,
+                    outline=""
+                )
+
+                # Explanation text
+                if not is_complete:
+                    explanation_parts = prob_explanation.split("\n")
+                    main_explanation = explanation_parts[0] if explanation_parts else prob_explanation
+
+                    explanation_label = tk.Label(
+                        left_frame,
+                        text=f"📊 {main_explanation}",
+                        font=("Arial", 9),
+                        fg="#666"
+                    )
+                    explanation_label.pack(anchor="w")
+
+                # Right side: Delete button
+                delete_btn = tk.Button(
+                    obj_frame,
+                    text="🗑️",
+                    command=lambda gid=game_id, oid=obj["id"]: self._delete_objective(gid, oid),
+                    fg="red",
+                    cursor="hand2",
+                    width=3
+                )
+                delete_btn.pack(side=tk.RIGHT, padx=(10, 0))
+
+    def _add_objective(self):
+        """Show dialog to add a new objective."""
+        AddObjectiveDialog(self.window, self.storage, self._load_objectives)
+
+    def _delete_objective(self, game_id: int, objective_id: str):
+        """Delete an objective."""
+        obj = None
+        for o in self.storage.get_objectives(game_id):
+            if o["id"] == objective_id:
+                obj = o
+                break
+
+        if not obj:
+            return
+
+        response = messagebox.askyesno(
+            "Confirmar Exclusão",
+            f"Tem certeza que deseja deletar o objetivo:\n\n'{obj['name']}'?"
+        )
+
+        if response:
+            self.storage.remove_objective(game_id, objective_id)
+            self._load_objectives()
+
+
+class AddObjectiveDialog:
+    """Dialog to add a new objective."""
+
+    def __init__(self, parent, storage: Storage, callback):
+        self.storage = storage
+        self.callback = callback
+
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Adicionar Objetivo")
+        self.dialog.geometry("450x450")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+
+        self._setup_ui()
+
+    def _setup_ui(self):
+        """Setup the add objective dialog UI."""
+        main_frame = ttk.Frame(self.dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Title
+        title_label = tk.Label(
+            main_frame,
+            text="➕ Novo Objetivo",
+            font=("Arial", 14, "bold")
+        )
+        title_label.pack(pady=(0, 20))
+
+        # Game selection
+        ttk.Label(main_frame, text="Jogo:", font=("Arial", 10, "bold")).pack(anchor="w")
+        self.game_var = tk.StringVar()
+        game_combo = ttk.Combobox(
+            main_frame,
+            textvariable=self.game_var,
+            state="readonly",
+            font=("Arial", 10)
+        )
+
+        games = self.storage.get_all_games()
+        game_options = [f"{game_id}: {config['name']}" for game_id, config in games.items()]
+        game_combo['values'] = game_options
+        if game_options:
+            game_combo.current(0)
+        game_combo.pack(fill=tk.X, pady=(0, 10))
+
+        # Objective name
+        ttk.Label(main_frame, text="Nome do Objetivo:", font=("Arial", 10, "bold")).pack(anchor="w")
+        self.name_entry = ttk.Entry(main_frame, font=("Arial", 10))
+        self.name_entry.pack(fill=tk.X, pady=(0, 10))
+        self.name_entry.insert(0, "Ex: Klee R1")
+
+        # Pulls needed
+        ttk.Label(main_frame, text="Pulls Necessários (máximo):", font=("Arial", 10, "bold")).pack(anchor="w")
+        self.pulls_entry = ttk.Entry(main_frame, font=("Arial", 10))
+        self.pulls_entry.pack(fill=tk.X, pady=(0, 10))
+        self.pulls_entry.insert(0, "180")
+
+        # Current pity
+        ttk.Label(main_frame, text="Pity Atual (0-89):", font=("Arial", 10, "bold")).pack(anchor="w")
+        pity_frame = ttk.Frame(main_frame)
+        pity_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.pity_entry = ttk.Entry(pity_frame, font=("Arial", 10), width=10)
+        self.pity_entry.pack(side=tk.LEFT)
+        self.pity_entry.insert(0, "0")
+
+        ttk.Label(
+            pity_frame,
+            text="  (quantos pulls desde o último 5★)",
+            font=("Arial", 8),
+            foreground="gray"
+        ).pack(side=tk.LEFT)
+
+        # Guaranteed checkbox
+        self.guaranteed_var = tk.BooleanVar(value=False)
+        guaranteed_check = ttk.Checkbutton(
+            main_frame,
+            text="✓ Próximo 5★ é GARANTIDO (perdeu o 50/50 antes)",
+            variable=self.guaranteed_var,
+            style="TCheckbutton"
+        )
+        guaranteed_check.pack(anchor="w", pady=(0, 20))
+
+        # Info label
+        info_label = tk.Label(
+            main_frame,
+            text="💡 O Ntropy calculará a probabilidade real considerando\npity e 50/50 automaticamente!",
+            font=("Arial", 9),
+            fg="#666",
+            justify=tk.LEFT,
+            bg="#f0f0f0",
+            padx=10,
+            pady=5
+        )
+        info_label.pack(fill=tk.X, pady=(0, 15))
+
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X)
+
+        save_btn = tk.Button(
+            button_frame,
+            text="✓ Salvar",
+            command=self._save,
+            font=("Arial", 11, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            cursor="hand2"
+        )
+        save_btn.pack(side=tk.LEFT, padx=(0, 5))
+
+        cancel_btn = tk.Button(
+            button_frame,
+            text="✗ Cancelar",
+            command=self.dialog.destroy,
+            font=("Arial", 11),
+            cursor="hand2"
+        )
+        cancel_btn.pack(side=tk.LEFT)
+
+    def _save(self):
+        """Save the new objective."""
+        # Get selected game ID
+        game_str = self.game_var.get()
+        if not game_str:
+            messagebox.showerror("Erro", "Selecione um jogo")
+            return
+
+        game_id = int(game_str.split(":")[0])
+
+        # Get objective name
+        name = self.name_entry.get().strip()
+        if not name or name == "Ex: Klee R1":
+            messagebox.showerror("Erro", "Digite um nome para o objetivo")
+            return
+
+        # Get pulls needed
+        try:
+            pulls_needed = int(self.pulls_entry.get().strip())
+            if pulls_needed <= 0:
+                raise ValueError()
+        except ValueError:
+            messagebox.showerror("Erro", "Digite um número válido de pulls (maior que 0)")
+            return
+
+        # Get current pity
+        try:
+            current_pity = int(self.pity_entry.get().strip())
+            if current_pity < 0 or current_pity > 89:
+                messagebox.showerror("Erro", "Pity deve estar entre 0 e 89")
+                return
+        except ValueError:
+            messagebox.showerror("Erro", "Digite um número válido para o pity")
+            return
+
+        # Get guaranteed status
+        guaranteed = self.guaranteed_var.get()
+
+        # Save objective with all parameters
+        self.storage.add_objective(game_id, name, pulls_needed, current_pity, guaranteed)
+
+        # Close dialog and refresh parent
+        self.dialog.destroy()
+        if self.callback:
+            self.callback()
+
+        messagebox.showinfo("Sucesso", f"Objetivo '{name}' adicionado com sucesso!")

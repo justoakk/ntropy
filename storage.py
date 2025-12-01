@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 
 class Storage:
-    """Handles all data persistence for the Cash Tracker application."""
+    """Handles all data persistence for the Ntropy application."""
 
     def __init__(self, data_file="data.json", config_file="config.json"):
         self.data_file = data_file
@@ -298,3 +298,193 @@ class Storage:
             writer = csv.DictWriter(f, fieldnames=["id", "game_id", "value", "timestamp", "notes"])
             writer.writeheader()
             writer.writerows(captures)
+
+    # Objective management methods
+
+    def add_objective(
+        self,
+        game_id: int,
+        name: str,
+        pulls_needed: int,
+        current_pity: int = 0,
+        guaranteed: bool = False
+    ) -> str:
+        """
+        Add a new objective for a specific game. Returns the objective ID.
+
+        Args:
+            game_id: Game identifier (1-4)
+            name: Objective name (e.g., "Klee R1")
+            pulls_needed: Maximum pulls needed (usually 180 for double pity)
+            current_pity: Current pity counter (0-89)
+            guaranteed: Whether next 5-star is guaranteed to be featured
+        """
+        config = self.get_config()
+
+        if "games" not in config or str(game_id) not in config["games"]:
+            return None
+
+        # Initialize objectives list if not exists
+        if "objectives" not in config["games"][str(game_id)]:
+            config["games"][str(game_id)]["objectives"] = []
+
+        objectives = config["games"][str(game_id)]["objectives"]
+
+        # Generate new objective ID
+        existing_ids = [int(obj.get("id", "0").replace("obj_", "")) for obj in objectives if "id" in obj]
+        new_id_num = max(existing_ids, default=0) + 1
+        new_id = f"obj_{new_id_num}"
+
+        # Create new objective
+        objective = {
+            "id": new_id,
+            "name": name,
+            "pulls_needed": pulls_needed,
+            "current_pity": current_pity,
+            "guaranteed": guaranteed,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "completed": False
+        }
+
+        objectives.append(objective)
+        self._write_json(self.config_file, config)
+
+        return new_id
+
+    def remove_objective(self, game_id: int, objective_id: str) -> bool:
+        """Remove an objective from a specific game. Returns True if removed."""
+        config = self.get_config()
+
+        if "games" not in config or str(game_id) not in config["games"]:
+            return False
+
+        if "objectives" not in config["games"][str(game_id)]:
+            return False
+
+        objectives = config["games"][str(game_id)]["objectives"]
+        original_count = len(objectives)
+
+        objectives = [obj for obj in objectives if obj.get("id") != objective_id]
+
+        if len(objectives) < original_count:
+            config["games"][str(game_id)]["objectives"] = objectives
+            self._write_json(self.config_file, config)
+            return True
+
+        return False
+
+    def get_objectives(self, game_id: int) -> List[dict]:
+        """Get all objectives for a specific game."""
+        game_config = self.get_game_config(game_id)
+
+        if not game_config:
+            return []
+
+        return game_config.get("objectives", [])
+
+    def get_all_objectives(self) -> Dict[int, List[dict]]:
+        """Get all objectives for all games."""
+        all_objectives = {}
+
+        for game_id in range(1, 5):
+            objectives = self.get_objectives(game_id)
+            if objectives:
+                all_objectives[game_id] = objectives
+
+        return all_objectives
+
+    def update_objective(self, game_id: int, objective_id: str, **kwargs) -> bool:
+        """Update an objective with provided key-value pairs. Returns True if updated."""
+        config = self.get_config()
+
+        if "games" not in config or str(game_id) not in config["games"]:
+            return False
+
+        if "objectives" not in config["games"][str(game_id)]:
+            return False
+
+        objectives = config["games"][str(game_id)]["objectives"]
+
+        for obj in objectives:
+            if obj.get("id") == objective_id:
+                obj.update(kwargs)
+                self._write_json(self.config_file, config)
+                return True
+
+        return False
+
+    def get_objective_progress(self, game_id: int, objective_id: str) -> Optional[dict]:
+        """
+        Calculate progress for a specific objective.
+        Returns dict with: {objective, current_pulls, progress_percent, remaining, real_probability}
+        """
+        objectives = self.get_objectives(game_id)
+        objective = None
+
+        for obj in objectives:
+            if obj.get("id") == objective_id:
+                objective = obj
+                break
+
+        if not objective:
+            return None
+
+        # Get last capture for this game to determine current pulls
+        last_capture = self.get_last_capture(game_id=game_id)
+        current_pulls = last_capture.get("value", 0) if last_capture else 0
+
+        pulls_needed = objective.get("pulls_needed", 180)
+        current_pity = objective.get("current_pity", 0)
+        guaranteed = objective.get("guaranteed", False)
+
+        # Calculate basic progress (pulls saved / pulls needed)
+        progress_percent = (current_pulls / pulls_needed * 100) if pulls_needed > 0 else 0
+        progress_percent = min(progress_percent, 100)  # Cap at 100%
+
+        remaining = max(pulls_needed - current_pulls, 0)
+
+        # Calculate real probability using gacha calculator
+        try:
+            from gacha_probability import get_calculator
+            calc = get_calculator()
+            prob_info = calc.get_probability_explanation(
+                int(current_pulls),
+                current_pity,
+                guaranteed
+            )
+
+            real_probability = prob_info["percentage"]
+            probability_explanation = prob_info["explanation"]
+        except Exception:
+            # Fallback if calculator fails
+            real_probability = progress_percent
+            probability_explanation = "Cálculo simples (pulls / total)"
+
+        return {
+            "objective": objective,
+            "current_pulls": current_pulls,
+            "progress_percent": progress_percent,
+            "real_probability": real_probability,
+            "probability_explanation": probability_explanation,
+            "remaining": remaining,
+            "is_complete": real_probability >= 99.0  # 99%+ is essentially guaranteed
+        }
+
+    def get_all_objectives_progress(self) -> Dict[int, List[dict]]:
+        """Get progress for all objectives across all games."""
+        all_progress = {}
+
+        for game_id in range(1, 5):
+            objectives = self.get_objectives(game_id)
+
+            if objectives:
+                game_progress = []
+                for obj in objectives:
+                    progress = self.get_objective_progress(game_id, obj.get("id"))
+                    if progress:
+                        game_progress.append(progress)
+
+                if game_progress:
+                    all_progress[game_id] = game_progress
+
+        return all_progress

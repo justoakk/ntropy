@@ -50,7 +50,7 @@ brew install tesseract
 ### 2. Instalar Dependências Python
 
 ```bash
-cd cash_tracker
+cd ntropy
 pip install -r requirements.txt
 ```
 
@@ -119,7 +119,7 @@ pip install Pillow pytesseract pynput
 ## Estrutura de Arquivos
 
 ```
-cash_tracker/
+ntropy/
 ├── main.py              # Ponto de entrada da aplicação
 ├── gui.py               # Interface gráfica principal
 ├── capture.py           # Módulo de captura de tela

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ntropy - Cash Tracker Launcher
+# Ntropy Launcher
 
 # Vai para o diretório do app
 cd "$(dirname "$0")"
