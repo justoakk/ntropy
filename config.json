@@ -10,20 +10,11 @@
       "objectives": [
         {
           "id": "obj_1",
-          "name": "Columbina",
+          "name": "Xilonen",
           "pulls_needed": 180,
-          "current_pity": 0,
+          "current_pity": 70,
           "guaranteed": false,
-          "created_at": "2025-12-01 14:50:24",
-          "completed": false
-        },
-        {
-          "id": "obj_2",
-          "name": "Klee",
-          "pulls_needed": 180,
-          "current_pity": 0,
-          "guaranteed": true,
-          "created_at": "2025-12-01 14:50:40",
+          "created_at": "2025-12-01 15:02:11",
           "completed": false
         }
       ]

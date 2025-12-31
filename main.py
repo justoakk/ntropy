@@ -6,8 +6,15 @@ Main entry point for the application.
 """
 
 import sys
+import os
 import tkinter as tk
 from tkinter import messagebox
+
+
+def _is_frozen():
+    """Verifica se está rodando como executável PyInstaller."""
+    return getattr(sys, 'frozen', False)
+
 
 def check_dependencies():
     """Check if all required dependencies are installed."""
@@ -20,11 +27,24 @@ def check_dependencies():
 
     try:
         import pytesseract
+
+        # Se está rodando como executável, configurar Tesseract embutido
+        if _is_frozen():
+            base_path = sys._MEIPASS
+            tesseract_path = os.path.join(base_path, 'tesseract', 'tesseract.exe')
+            if os.path.exists(tesseract_path):
+                pytesseract.pytesseract.tesseract_cmd = tesseract_path
+                tessdata_path = os.path.join(base_path, 'tesseract', 'tessdata')
+                os.environ['TESSDATA_PREFIX'] = tessdata_path
+
         # Try to get Tesseract version to verify it's installed
         try:
             pytesseract.get_tesseract_version()
         except Exception:
-            missing.append("Tesseract OCR (sistema)")
+            if not _is_frozen():
+                missing.append("Tesseract OCR (sistema)")
+            else:
+                missing.append("Tesseract OCR (embutido não encontrado)")
     except ImportError:
         missing.append("pytesseract")
 

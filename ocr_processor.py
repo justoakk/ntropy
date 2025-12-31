@@ -1,4 +1,6 @@
 import re
+import sys
+import os
 from PIL import Image
 from typing import Optional
 
@@ -6,6 +8,27 @@ try:
     import pytesseract
 except ImportError:
     pytesseract = None
+
+
+def _get_tesseract_path():
+    """Retorna o caminho do Tesseract embutido (se executável frozen)."""
+    if getattr(sys, 'frozen', False):
+        # Executável PyInstaller - verificar Tesseract embutido
+        base_path = sys._MEIPASS
+        tesseract_path = os.path.join(base_path, 'tesseract', 'tesseract.exe')
+        if os.path.exists(tesseract_path):
+            # Configurar TESSDATA_PREFIX para os dados de idioma
+            tessdata_path = os.path.join(base_path, 'tesseract', 'tessdata')
+            os.environ['TESSDATA_PREFIX'] = tessdata_path
+            return tesseract_path
+    return None
+
+
+# Configurar pytesseract para usar Tesseract embutido se disponível
+if pytesseract is not None:
+    _embedded_tesseract = _get_tesseract_path()
+    if _embedded_tesseract:
+        pytesseract.pytesseract.tesseract_cmd = _embedded_tesseract
 
 class OCRProcessor:
     """Handles OCR text extraction from images."""

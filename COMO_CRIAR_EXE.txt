@@ -1,0 +1,188 @@
+================================================================================
+                    COMO CRIAR O EXECUTAVEL NTROPY.EXE
+                     (Standalone - Sem dependencias)
+================================================================================
+
+Este guia explica como criar um executavel que funciona sem instalar nada.
+O usuario final so baixa o Ntropy.exe e executa.
+
+================================================================================
+REQUISITOS
+================================================================================
+
+- Windows 10 ou 11 (64-bit)
+- Acesso a internet (para downloads)
+- Aproximadamente 500MB de espaco livre
+
+================================================================================
+PASSO 1: INSTALAR PYTHON
+================================================================================
+
+1. Acesse: https://www.python.org/downloads/
+
+2. Baixe a versao mais recente do Python 3 (ex: Python 3.12.x)
+
+3. Execute o instalador
+
+4. IMPORTANTE: Marque a opcao "Add Python to PATH" na primeira tela!
+
+5. Clique em "Install Now"
+
+6. Verifique a instalacao abrindo o Prompt de Comando (cmd) e digitando:
+
+   python --version
+
+   Deve mostrar algo como: Python 3.12.x
+
+================================================================================
+PASSO 2: INSTALAR DEPENDENCIAS PYTHON
+================================================================================
+
+1. Abra o Prompt de Comando (cmd)
+
+2. Navegue ate a pasta do projeto:
+
+   cd C:\caminho\para\ntropy
+
+   (substitua pelo caminho real onde esta o projeto)
+
+3. Instale as dependencias:
+
+   pip install -r requirements.txt
+
+4. Aguarde a instalacao completar
+
+================================================================================
+PASSO 3: CONFIGURAR O TESSERACT
+================================================================================
+
+O Tesseract OCR sera embutido no executavel final.
+
+OPCAO A - Automatizado (Recomendado):
+-------------------------------------
+1. Execute o script:
+
+   setup_tesseract.bat
+
+2. Siga as instrucoes na tela
+
+OPCAO B - Manual:
+-----------------
+1. Baixe o Tesseract de:
+   https://github.com/UB-Mannheim/tesseract/wiki
+
+   Procure por: tesseract-ocr-w64-setup-X.XX.X.exe
+
+2. Execute o instalador e instale normalmente
+   (pode ser em qualquer pasta, ex: C:\Program Files\Tesseract-OCR)
+
+3. Crie a pasta "tesseract" dentro do projeto:
+
+   mkdir tesseract
+   mkdir tesseract\tessdata
+
+4. Copie os arquivos da instalacao do Tesseract:
+
+   DE: C:\Program Files\Tesseract-OCR\
+   PARA: [pasta do projeto]\tesseract\
+
+   Arquivos necessarios:
+   - tesseract.exe
+   - Todos os arquivos .dll
+
+   DE: C:\Program Files\Tesseract-OCR\tessdata\
+   PARA: [pasta do projeto]\tesseract\tessdata\
+
+   Arquivos necessarios:
+   - eng.traineddata (obrigatorio)
+   - por.traineddata (opcional, para portugues)
+
+5. Estrutura final deve ser:
+
+   ntropy\
+   ├── tesseract\
+   │   ├── tesseract.exe
+   │   ├── *.dll (varios arquivos)
+   │   └── tessdata\
+   │       └── eng.traineddata
+   └── (outros arquivos do projeto)
+
+================================================================================
+PASSO 4: CRIAR O EXECUTAVEL
+================================================================================
+
+1. Execute o script de build:
+
+   build_exe.bat
+
+2. Aguarde a compilacao (pode demorar alguns minutos)
+
+3. Se tudo der certo, voce vera:
+
+   [3/3] Build completo!
+   O executavel foi criado em: dist\Ntropy.exe
+
+================================================================================
+PASSO 5: RESULTADO FINAL
+================================================================================
+
+O executavel esta em: dist\Ntropy.exe
+
+Tamanho aproximado: 80-100 MB
+
+Este arquivo JA CONTEM TUDO:
+- Python runtime
+- Todas as bibliotecas (Pillow, pynput, etc)
+- Tesseract OCR completo
+- Dados de idioma
+
+Para distribuir:
+- Copie apenas o Ntropy.exe
+- Os arquivos config.json e data.json serao criados automaticamente
+
+================================================================================
+PROBLEMAS COMUNS
+================================================================================
+
+PROBLEMA: "python nao e reconhecido como comando"
+SOLUCAO: Reinstale o Python marcando "Add to PATH"
+
+PROBLEMA: "pip nao e reconhecido como comando"
+SOLUCAO: Use "python -m pip" em vez de "pip"
+
+PROBLEMA: "Pasta tesseract\ nao encontrada"
+SOLUCAO: Execute setup_tesseract.bat ou siga o Passo 3 manual
+
+PROBLEMA: "tesseract.exe nao encontrado"
+SOLUCAO: Verifique se copiou o tesseract.exe para a pasta tesseract\
+
+PROBLEMA: "eng.traineddata nao encontrado"
+SOLUCAO: Copie o arquivo eng.traineddata para tesseract\tessdata\
+
+PROBLEMA: Antivirus bloqueia o .exe
+SOLUCAO: Adicione excecao no antivirus (falso positivo do PyInstaller)
+
+PROBLEMA: Executavel muito grande (100MB+)
+SOLUCAO: Normal! Inclui Python + bibliotecas + Tesseract completo
+
+PROBLEMA: OCR nao funciona no executavel
+SOLUCAO: Refaca o Passo 3 e recompile
+
+================================================================================
+DICAS
+================================================================================
+
+- Teste o executavel na mesma maquina antes de distribuir
+- O primeiro inicio pode demorar alguns segundos (normal)
+- config.json e data.json sao criados ao lado do .exe na primeira execucao
+
+================================================================================
+SUPORTE
+================================================================================
+
+Se tiver problemas, verifique:
+1. Python esta no PATH? (python --version funciona?)
+2. Pasta tesseract\ existe com todos os arquivos?
+3. Todos os .dll foram copiados?
+
+================================================================================

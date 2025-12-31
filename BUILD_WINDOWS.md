@@ -1,122 +1,103 @@
 # Como criar executável para Windows
 
-## Método 1 - Script .bat (Mais simples)
+## Opção 1: Executável Auto-Contido (Recomendado)
 
-✅ **Já está pronto!** Basta clicar duas vezes em `ntropy.bat`
+Cria um `.exe` que **já inclui o Tesseract OCR**. O usuário final apenas baixa e executa.
 
-**Vantagens:**
-- Instantâneo, não precisa compilar
-- Fácil de modificar código
-- Funciona imediatamente
+### Passo 1: Configurar Tesseract
 
-**Desvantagens:**
-- Precisa do Python instalado
-- Abre janela do terminal
+Execute `setup_tesseract.bat` e siga as instruções, ou faça manualmente:
+
+1. Baixe o Tesseract de: https://github.com/UB-Mannheim/tesseract/wiki
+2. Instale normalmente
+3. Copie os arquivos para a pasta `tesseract/`:
+
+```
+tesseract/
+├── tesseract.exe
+├── *.dll (todas as DLLs)
+└── tessdata/
+    └── eng.traineddata
+```
+
+### Passo 2: Criar o Executável
+
+```bash
+build_exe.bat
+```
+
+O executável será criado em `dist/Ntropy.exe` (~80-100MB).
+
+### Resultado
+
+- Usuário baixa `Ntropy.exe`
+- Executa diretamente
+- Funciona sem instalar nada
 
 ---
 
-## Método 2 - Executável .exe (Recomendado para distribuição)
+## Opção 2: Executável Simples (Requer Tesseract no sistema)
 
-### Passo 1: Instalar PyInstaller
+Para quem já tem Tesseract instalado no Windows.
 
-Abra o CMD/PowerShell e execute:
+### Criar o .exe
+
 ```bash
 pip install pyinstaller
-```
-
-### Passo 2: Criar o .exe
-
-**Opção A - Executável único (mais simples):**
-```bash
-cd C:\caminho\para\ntropy
 pyinstaller --onefile --windowed --name="Ntropy" main.py
 ```
 
-**Opção B - Com todas as dependências separadas:**
-```bash
-pyinstaller --windowed --name="Ntropy" main.py
-```
+O executável estará em `dist/Ntropy.exe` (~30-40MB).
 
-### Passo 3: Encontrar o executável
-
-Após a compilação:
-- O executável estará em: `dist\Ntropy.exe`
-- Você pode copiar esse arquivo para qualquer lugar
-- **IMPORTANTE**: Copie também `config.json` e `data.json` junto
+**Nota:** O usuário final precisa ter o Tesseract instalado.
 
 ---
 
-## Método 3 - Executável com Ícone personalizado
+## Opção 3: Script .bat (Desenvolvimento)
 
-1. Baixe/crie um ícone `.ico` e salve como `icon.ico` na pasta ntropy
-2. Execute:
+Para desenvolvimento, use `ntropy.bat`:
+
 ```bash
-pyinstaller --onefile --windowed --icon=icon.ico --name="Ntropy" main.py
+ntropy.bat
 ```
+
+Requer Python e dependências instaladas.
 
 ---
 
-## Problemas comuns
+## Arquivos de Build
 
-### "Python não é reconhecido como comando"
-→ Python não está instalado ou não está no PATH
-→ Baixe em: https://www.python.org/downloads/
-→ Durante instalação, marque "Add Python to PATH"
+| Arquivo | Descrição |
+|---------|-----------|
+| `build_exe.bat` | Cria executável com Tesseract embutido |
+| `setup_tesseract.bat` | Ajuda a configurar pasta tesseract/ |
+| `ntropy.spec` | Configuração PyInstaller detalhada |
+| `ntropy.bat` | Launcher simples (requer Python) |
 
-### "pip não é reconhecido como comando"
-→ Execute: `python -m pip install pyinstaller`
+---
 
-### Executável muito grande (>100MB)
-→ É normal! PyInstaller inclui o Python inteiro
-→ Use `--onefile` para um único arquivo
+## Estrutura para Distribuição
+
+Ao distribuir, inclua apenas:
+
+```
+Ntropy.exe          <- O executável (já contém tudo)
+```
+
+Os arquivos `config.json` e `data.json` serão criados automaticamente na primeira execução.
+
+---
+
+## Problemas Comuns
 
 ### Antivírus bloqueia o .exe
-→ Normal com PyInstaller
-→ Adicione exceção no antivírus
-→ Ou use o script `.bat` que não tem esse problema
+Normal com PyInstaller. Adicione exceção no antivírus.
 
----
+### Executável muito grande
+O executável com Tesseract embutido tem ~80-100MB. Isso é esperado pois inclui:
+- Python runtime
+- Bibliotecas (Pillow, pynput, etc)
+- Tesseract OCR completo
 
-## Estrutura para distribuição
-
-Ao distribuir o app, inclua:
-```
-Ntropy/
-├── Ntropy.exe          ← Executável
-├── config.json         ← Configurações (será criado na 1ª execução)
-├── data.json           ← Dados (será criado na 1ª captura)
-└── README.txt          ← Instruções para o usuário
-```
-
----
-
-## Comandos úteis PyInstaller
-
-```bash
-# Básico
-pyinstaller main.py
-
-# Um arquivo único + sem console
-pyinstaller --onefile --windowed main.py
-
-# Com nome personalizado
-pyinstaller --onefile --windowed --name="Ntropy" main.py
-
-# Com ícone
-pyinstaller --onefile --windowed --icon=icon.ico --name="Ntropy" main.py
-
-# Limpar builds anteriores
-rmdir /s /q build dist
-del *.spec
-```
-
----
-
-## Recomendação final
-
-**Para você usar:**
-→ Use `ntropy.bat` (mais prático durante desenvolvimento)
-
-**Para distribuir para outras pessoas:**
-→ Use PyInstaller e crie `Ntropy.exe`
-→ Assim elas não precisam instalar Python
+### OCR não funciona no executável
+Verifique se a pasta `tesseract/` foi configurada corretamente antes do build.
